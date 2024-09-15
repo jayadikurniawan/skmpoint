@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const Admin = require('../models/Admin');
 const mongoose = require('mongoose');
 const router = express.Router();
 
@@ -156,6 +157,71 @@ router.get('/activities/:username', async (req, res) => {
     // Kirimkan daftar aktivitas
     res.json({ activities: student.activities });
   });
+
+
+router.post('/admin/login', async (req, res) => {
+    const { username, password } = req.body;
+  
+    // Validasi input
+    if (!username || !password) {
+      return res.status(400).json({ msg: 'Username dan password harus diisi' });
+    }
+  
+    // Cek apakah admin ada di database
+    const admin = await Admin.findOne({ username });
+    if (!admin) {
+      return res.status(400).json({ msg: 'Admin tidak ditemukan' });
+    }
+  
+    // Cek password
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return res.status(400).json({ msg: 'Password salah' });
+    }
+  
+    // Jika berhasil login, kirim respons
+    res.json({ msg: 'Login admin berhasil', admin });
+  });
+
+// Rute untuk mendapatkan semua SKM mahasiswa yang statusnya pending
+router.get('/admin/pending-activities', async (req, res) => {
+    const students = await Student.find({ 'activities.status': 'Pending' });
+    
+    // Ambil semua kegiatan yang statusnya pending
+    const pendingActivities = students.map(student => {
+      return {
+        username: student.username,
+        biodata: student.biodata,
+        activities: student.activities.filter(activity => activity.status === 'Pending')
+      };
+    });
+  
+    res.json(pendingActivities);
+  });
+  
+  // Rute untuk menyetujui SKM mahasiswa
+router.post('/admin/approve-activity', async (req, res) => {
+    const { username, activityId } = req.body;
+  
+    // Cari mahasiswa berdasarkan username dan update status aktivitasnya
+    const student = await Student.findOne({ username });
+    if (!student) {
+      return res.status(400).json({ msg: 'Mahasiswa tidak ditemukan' });
+    }
+  
+    // Update status aktivitas menjadi 'Accepted'
+    const activity = student.activities.id(activityId);
+    if (!activity) {
+      return res.status(400).json({ msg: 'Aktivitas tidak ditemukan' });
+    }
+  
+    activity.status = 'Accepted';
+    await student.save();
+  
+    res.json({ msg: 'Aktivitas berhasil disetujui' });
+  });
+  
+  
   
   
 
